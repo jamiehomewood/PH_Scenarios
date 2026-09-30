@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XRP Session Runner</title>
+<style>
+:root{
+  --bg:#0f1418; --panel:#171e24; --panel-2:#1e272e; --line:#2c3942;
+  --text:#e9eef1; --muted:#9aabb6; --accent:#4fd1b5; --accent-ink:#06231d;
+  --warn:#f2b155; --reveal:#8fb8ff; --notes:#f0c96a; --danger:#ff7a6b;
+  --scale:1;
+}
+:root[data-theme="light"]{
+  --bg:#f5f3ee; --panel:#ffffff; --panel-2:#efece5; --line:#d9d4c9;
+  --text:#1b2126; --muted:#5b6770; --accent:#0f8a73; --accent-ink:#ffffff;
+  --warn:#a8650c; --reveal:#2f5fb3; --notes:#8a6200; --danger:#b23a2c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:calc(17px*var(--scale))/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+.hidden{display:none!important}
+
+/* top bar */
+.bar{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+.bar h1{font-size:1rem;margin:0;font-weight:600;letter-spacing:.02em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .sp{flex:1}
+.btn{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:.85rem}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.on{outline:2px solid var(--notes);outline-offset:1px}
+.tools{display:flex;gap:6px;flex-wrap:wrap}
+
+/* home */
+.home{max-width:1200px;margin:0 auto;padding:28px 20px 60px}
+.home h2{font-size:1.9rem;margin:0 0 4px}
+.home p.lead{color:var(--muted);margin:0 0 24px;max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:left;display:flex;flex-direction:column;gap:8px;transition:border-color .15s,transform .15s}
+.card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.card .num{font-size:.75rem;color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.card h3{margin:0;font-size:1.15rem;line-height:1.25}
+.card p{margin:0;color:var(--muted);font-size:.9rem}
+.meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:6px}
+.chip{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted)}
+.resume{color:var(--warn);font-size:.78rem;font-weight:600}
+
+/* overview */
+.overview{max-width:1000px;margin:0 auto;padding:28px 20px 60px}
+.overview h2{font-size:2rem;margin:4px 0 6px;line-height:1.15}
+.overview .num{color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.8rem}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.box h4{margin:0 0 8px;font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.box ul,.box ol{margin:0;padding-left:1.2em}
+.box li{margin:3px 0}
+.box.warn{border-color:var(--warn)}
+.box.warn h4{color:var(--warn)}
+.box.full{grid-column:1/-1}
+.setup td{padding:4px 10px 4px 0;vertical-align:top;border-bottom:1px solid var(--line);font-size:.9rem}
+.setup td:first-child{color:var(--muted);white-space:nowrap}
+.setup{border-collapse:collapse;width:100%}
+
+/* session */
+.session{display:grid;grid-template-columns:250px 1fr;min-height:calc(100vh - 53px)}
+.rail{border-right:1px solid var(--line);background:var(--panel);padding:14px 10px;overflow:auto}
+.rail button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:8px 10px;color:var(--muted);font-size:.88rem;line-height:1.3}
+.rail button .n{flex:0 0 22px;height:22px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:.72rem}
+.rail button.done .n{background:var(--panel-2);color:var(--accent);border-color:var(--accent)}
+.rail button.cur{background:var(--panel-2);color:var(--text)}
+.rail button.cur .n{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.stage{padding:26px 36px 80px;max-width:1150px;width:100%}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.8rem}
+.stage h2{font-size:2.5rem;line-height:1.1;margin:6px 0 14px}
+.cue{display:inline-flex;gap:8px;align-items:center;border:1px dashed var(--muted);border-radius:8px;padding:5px 10px;color:var(--muted);font-size:.82rem;margin-bottom:16px}
+.cue b{color:var(--text);font-weight:600}
+.brief{font-size:1.3rem;max-width:62ch;margin:0 0 22px}
+.row{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.timer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px}
+.timer .t{font-variant-numeric:tabular-nums;font-size:2rem;font-weight:700;min-width:4.2ch}
+.timer.run .t{color:var(--accent)}
+.timer.end{border-color:var(--danger);animation:pulse 1s ease-in-out infinite}
+.timer.end .t{color:var(--danger)}
+@keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--danger) 25%,transparent)}}
+.timer .lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+h3.sec{font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:28px 0 10px;display:flex;align-items:center;gap:10px}
+h3.sec .btn{font-size:.72rem;padding:3px 8px;text-transform:none;letter-spacing:0}
+.prompts{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.prompts li{font-size:1.35rem;padding:10px 16px;border-left:4px solid var(--accent);background:var(--panel);border-radius:0 10px 10px 0}
+.prompts li.ghost{border-left-color:var(--line);color:var(--muted);font-size:.95rem;background:none;cursor:pointer;animation:none}
+@keyframes in{from{transform:translateY(8px)}}
+.reveals{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.rv{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--panel);text-align:left;min-height:84px}
+.rv.shut{background:repeating-linear-gradient(135deg,var(--panel),var(--panel) 10px,var(--panel-2) 10px,var(--panel-2) 20px);color:var(--muted);display:grid;place-items:center;font-weight:600}
+.rv.open{border-color:var(--reveal);font-size:1.1rem}
+.new{animation:in .35s ease}
+.rv .rl{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--reveal);margin-bottom:4px}
+.notes{margin-top:28px;border:1px solid var(--notes);border-radius:12px;padding:14px 18px;background:color-mix(in srgb,var(--notes) 7%,var(--panel))}
+.notes h4{margin:0 0 6px;color:var(--notes);font-size:.8rem;text-transform:uppercase;letter-spacing:.1em}
+.notes ul{margin:0;padding-left:1.2em}
+.notes li{margin:4px 0;font-size:.95rem}
+.navfoot{display:flex;gap:10px;margin-top:34px}
+.assign{display:grid;gap:8px;max-width:760px}
+.assign .ar{display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:1.15rem}
+.assign .g{font-weight:700;color:var(--accent);min-width:5.5ch}
+.assign .ctl{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.assign input{width:4em;font:inherit;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+
+/* help */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:20;padding:16px}
+.modal .inner{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 24px;max-width:520px;width:100%}
+.modal table{width:100%;border-collapse:collapse}
+.modal td{padding:5px 0;border-bottom:1px solid var(--line);font-size:.92rem}
+kbd{background:var(--panel-2);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font:600 .8rem ui-monospace,Consolas,monospace}
+
+/* print pack */
+.pack{display:none}
+@media print{
+  body{background:#fff;color:#000;font-size:11pt}
+  .app{display:none!important}
+  .pack{display:block}
+  .pack h1{font-size:18pt;margin:0 0 4pt}
+  .pack h2{font-size:13pt;margin:16pt 0 4pt;border-bottom:1px solid #999;page-break-after:avoid}
+  .pack h3{font-size:10pt;text-transform:uppercase;letter-spacing:.06em;margin:8pt 0 2pt;color:#444}
+  .pack .cue{border:1px dashed #777;color:#333;padding:2pt 6pt;margin:4pt 0;font-size:9pt}
+  .pack section{page-break-inside:avoid}
+}
+
+@media (max-width:820px){
+  .session{grid-template-columns:1fr}
+  .rail{display:flex;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
+  .rail button{flex:0 0 auto;width:auto}
+  .rail button .lab{display:none}
+  .stage{padding:18px 16px 60px}
+  .stage h2{font-size:1.8rem}
+  .brief{font-size:1.1rem}
+  .prompts li{font-size:1.1rem}
+  .cols{grid-template-columns:1fr}
+  .bar{padding:8px 16px;flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar">
+    <h1 id="barTitle">XRP Session Runner · Public Health</h1>
+    <div class="tools">
+      <button class="btn" id="bHome" title="Scenario list (H)">Scenarios</button>
+      <button class="btn" id="bNotes" title="Facilitator notes (N)">Notes</button>
+      <button class="btn" id="bSmaller" title="Smaller text (−)">A−</button>
+      <button class="btn" id="bBigger" title="Larger text (+)">A+</button>
+      <button class="btn" id="bTheme" title="Light / dark">◐</button>
+      <button class="btn" id="bFull" title="Full screen (F)">⛶</button>
+      <button class="btn" id="bHelp" title="Keyboard shortcuts (?)">?</button>
+    </div>
+  </div>
+  <main id="view"><div class="home" id="nojs"><h2>This page needs JavaScript</h2><p class="lead">Scripts are blocked where this page is being shown. This often happens inside Canvas. Open the file directly in a browser, or use the Canvas versions in the <b>canvas</b> folder.</p></div></main>
+</div>
+<div class="pack" id="pack"></div>
+<div class="modal hidden" id="help"><div class="inner">
+  <h3 style="margin-top:0">Keyboard and clicker</h3>
+  <table>
+    <tr><td><kbd>→</kbd> / <kbd>PgDn</kbd></td><td>Next stage</td></tr>
+    <tr><td><kbd>←</kbd> / <kbd>PgUp</kbd></td><td>Previous stage</td></tr>
+    <tr><td><kbd>Space</kbd></td><td>Show next question</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Reveal next piece of information</td></tr>
+    <tr><td><kbd>T</kbd></td><td>Start / pause timer</td></tr>
+    <tr><td><kbd>0</kbd></td><td>Reset timer</td></tr>
+    <tr><td><kbd>N</kbd></td><td>Show / hide facilitator notes</td></tr>
+    <tr><td><kbd>+</kbd> <kbd>−</kbd></td><td>Text size</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Full screen</td></tr>
+    <tr><td><kbd>H</kbd></td><td>Back to scenario list</td></tr>
+  </table>
+  <p style="color:var(--muted);font-size:.85rem">Notes start hidden, so the screen is safe to project. Most presentation clickers send PgUp/PgDn, so they move between stages.</p>
+  <button class="btn primary" onclick="toggleHelp(false)">Close</button>
+</div></div>
+
+<script>
+/* ============================================================
+   SCENARIO CONTENT
+   Each stage: title, cue (what the room technician loads),
+   brief (read aloud / shown), minutes (timer), prompts (revealed
+   one at a time), reveals (hidden info cards), notes (facilitator only).
+   ============================================================ */
+const MARGARET_Q = [
+  "What can you observe?",
+  "What are Margaret's health needs?",
+  "What are her social needs?",
+  "What might professionals miss?",
+  "Who needs to be involved?",
+  "What barriers might she experience?",
+  "What could prevent hospital readmission?"
+];
+
+const SCENARIOS = [
+/* ---------------- 1 ---------------- */
+{
+  id:"s1", title:"A Day in the Life: Margaret's Journey", short:"Day in the life",
+  summary:"Follow Margaret, 78, recently widowed with COPD and mobility problems, from home through GP, hospital, discharge and back into the community.",
+  minutes:90, themes:["Integrated care","Readmission","Isolation"],
+  outcomes:[
+    "Identify health and social needs that interact across a care pathway",
+    "Explain how gaps at handover points (transitions) can lead to readmission",
+    "Map the professionals and community assets who should be involved",
+    "Apply the wider determinants of health to one person's experience"
+  ],
+  warning:"Bereavement and loneliness. Some students may have recent experience of losing a grandparent.",
+  stages:[
+    { title:"Meet Margaret", cue:"Neutral / title scene", minutes:3,
+      brief:"Margaret is 78. She lives alone following the death of her husband. She has COPD, mobility problems, and is becoming socially isolated. We will follow her through one journey of care.",
+      prompts:["Before we start: what assumptions are you already making about Margaret?"],
+      reveals:[], notes:["Capture assumptions on a flipchart now. Return to them in the debrief and see which ones held up.","Explain the rhythm: at each stage we stop and work through the same seven questions."]},
+    { title:"Home", cue:"360° scene: Margaret's home (cold, cluttered, stairs)", minutes:5,
+      brief:"It's a Tuesday morning in February. We're in Margaret's home.",
+      prompts:MARGARET_Q,
+      reveals:[
+        "Her husband Frank died eight months ago. He managed the money and did the driving.",
+        "She used to go to a Tuesday lunch club. She hasn't been since the funeral.",
+        "Two inhalers are on the kitchen side. One is empty. She isn't sure which is which.",
+        "She's sleeping in the chair downstairs because the stairs make her too breathless."
+      ],
+      notes:["Look for: a cold home (fuel poverty makes COPD worse), rugs and clutter (falls risk), stairs, one-person meals, sympathy cards.","Loneliness and social isolation are recognised risk factors for poorer physical and mental health.","Confusion about inhalers is a sign of low health literacy. Nobody has checked her inhaler technique.","Losing Frank also meant losing his roles: finances, transport, shared tasks. This is a hidden social need."]},
+    { title:"GP waiting room", cue:"360° scene: GP surgery waiting room + ambient audio", minutes:5,
+      brief:"Margaret has finally got an appointment about her breathing.",
+      prompts:MARGARET_Q,
+      reveals:[
+        "It took three weeks to get this appointment. She rang at 8am on four different days.",
+        "Reception suggested she \"use the NHS App next time\". She doesn't have a smartphone.",
+        "In a 10-minute consultation she mentions, as she's leaving, that she's \"not sleeping much\".",
+        "She missed her annual COPD review last year. Frank used to drive her."
+      ],
+      notes:["Digital exclusion and access barriers are an example of the inverse care law (Tudor Hart, 1971).","A \"doorknob\" disclosure may point to grief, low mood or anxiety. This is a Making Every Contact Count (MECC) opportunity.","Referral options: social prescribing link worker, pulmonary rehabilitation, an inhaler technique check, and flu, pneumococcal and COVID vaccinations.","Transport is a determinant of health. Losing a driver can mean losing access to care."]},
+    { title:"Hospital", cue:"360° scene: A&E / respiratory ward", minutes:5,
+      brief:"Three weeks later Margaret is brought into A&E by ambulance with worsening breathlessness.",
+      prompts:MARGARET_Q,
+      reveals:[
+        "She's admitted with an infective exacerbation of COPD.",
+        "On her second night she becomes confused and agitated. Staff suspect delirium.",
+        "She keeps asking who is feeding her cat.",
+        "The next-of-kin field is blank. Her son lives 200 miles away and doesn't know she's in hospital."
+      ],
+      notes:["Delirium is common in older inpatients. It is distressing and linked to longer stays and poorer outcomes.","Deconditioning: older people can lose mobility quickly during bed rest. Get her moving early.","The cat stands for the practical worries that stop people accepting admission or push them to leave early.","Discharge planning should begin on admission, not on the day she leaves."]},
+    { title:"Discharge", cue:"360° scene: ward bay / discharge lounge", minutes:5,
+      brief:"Margaret is medically fit for discharge.",
+      prompts:MARGARET_Q,
+      reveals:[
+        "It's Friday at 6pm. She waited four hours for her medication from pharmacy.",
+        "She has been shown a new inhaler technique once, while she was still recovering from delirium.",
+        "The discharge letter went to the GP. Nobody told the lunch club, a neighbour or her son.",
+        "She is going home by hospital transport to a house where the heating has been off for five days."
+      ],
+      notes:["Late Friday discharges happen when community services are closing for the weekend, which raises the risk of readmission.","Models to discuss: Discharge to Assess / Home First, reablement, and the community pharmacy Discharge Medicines Service.","Teaching given during delirium is unlikely to be remembered. Use teach-back once she has recovered.","Who is the named coordinator? Handovers between services are where needs go missing."]},
+    { title:"Home again", cue:"360° scene: Margaret's home (same scene, evening lighting)", minutes:5,
+      brief:"Margaret is back home. It's Friday night.",
+      prompts:MARGARET_Q,
+      reveals:[
+        "The fridge has half a pint of milk that is out of date.",
+        "She has turned the heating down to save money.",
+        "A neighbour pops round now and then, but doesn't know Margaret has been in hospital.",
+        "She's frightened of another \"attack\" and decides to stay in the chair all weekend."
+      ],
+      notes:["Readmission risks: cold home, poor nutrition, medication confusion, immobility, fear and anxiety, no follow-up in place.","Ask what would need to be in place at 6pm on Friday for this to go differently.","Fear of breathlessness leads to avoiding activity, which leads to deconditioning and more breathlessness. Pulmonary rehab and anxiety support can break the cycle."]},
+    { title:"Community & social care", cue:"360° scene: community centre / street", minutes:8,
+      brief:"Now design the support around Margaret.",
+      prompts:[
+        "Who needs to be involved, and who coordinates?",
+        "Which of these are health services, which are social care, and which are community or voluntary?",
+        "What would Margaret say matters most to her?",
+        "What could prevent hospital readmission?"
+      ],
+      reveals:[
+        "Available locally: a social prescribing link worker, district nurses, pulmonary rehab, Age UK befriending, a lunch club with transport.",
+        "Financial help she may be entitled to but has not claimed: Attendance Allowance, and the Warm Home Discount via her energy supplier.",
+        "Margaret says: \"I just want to be able to get to the shops and have someone to talk to.\""
+      ],
+      notes:["Build an ecomap on the board, with Margaret at the centre.","Care Act 2014 wellbeing principle and assessment of needs. Personalisation means asking \"what matters to you?\", not \"what's the matter with you?\"","Asset-based approach: the lunch club, the neighbour and her son are assets as well as formal services.","Public health angle: many of her needs are social and economic rather than clinical."]},
+    { title:"Debrief", cue:"Neutral / title scene", minutes:10,
+      brief:"Step back from Margaret's journey.",
+      prompts:[
+        "Where were the biggest missed opportunities?",
+        "Which of your first assumptions held up, and which didn't?",
+        "Which needs were health needs, and which were social? Was the line clear?",
+        "What does this tell us about integrated care?",
+        "One thing you'll do differently in practice."
+      ],
+      reveals:[], notes:["Link to Integrated Care Systems (ICSs) and population health management.","Return to the assumptions flipchart from Stage 1."]}
+  ]
+},
+/* ---------------- 2 ---------------- */
+{
+  id:"s2", title:"Spot the Safeguarding Concerns", short:"Safeguarding",
+  summary:"An immersive home full of clues. Students observe silently, then information is revealed gradually, moving from observation to safeguarding response.",
+  minutes:75, themes:["Safeguarding","Professional curiosity","Care Act 2014"],
+  outcomes:[
+    "Distinguish between an observation, a concern and an assumption",
+    "Demonstrate professional curiosity through questioning",
+    "Recognise indicators of self-neglect and financial abuse",
+    "Outline a proportionate safeguarding response under the Care Act 2014"
+  ],
+  warning:"Abuse and neglect. Remind students about support services and that they can step out.",
+  setup:"Place these clues in the home scene without drawing attention to them: little or no food, unopened medication (dated), dust or dirt and rubbish, unpaid bills or red reminders, a cold house (heater off, blankets, visible breath), signs of self-neglect (same clothes, soiled items), a bank card or letters addressed to someone else, and mobility hazards (loose rug, trailing cable, no rails).",
+  stages:[
+    { title:"Silent observation", cue:"360° scene: Arthur's home (clues placed)", minutes:5,
+      brief:"You are visiting this home. For five minutes, just look. Don't discuss. Write down what you notice.",
+      prompts:["Observe silently. Write down only what you can actually see."],
+      reveals:[], notes:["Don't mention safeguarding. Start the timer and stay silent.","Walk students around the room if the software supports navigation."]},
+    { title:"What did you notice?", cue:"Same scene", minutes:8,
+      brief:"Share what you noticed, then sort each item into one of three columns: Observation, Concern or Assumption.",
+      prompts:["What did you see?","Which of these are facts, and which are interpretations?","What else would you want to know?"],
+      reveals:[], notes:["Three columns on the board: OBSERVATION / CONCERN / ASSUMPTION.","Challenge interpretations: \"How do you know that's his?\" \"Could there be another explanation?\"","Clues to check they found: food, medication, bills, heating, self-neglect, someone else's post or card, trip hazards."]},
+    { title:"Information 1: health", cue:"Same scene", minutes:5,
+      brief:"You now learn more about the person who lives here.",
+      prompts:["Does this change how you read the environment?","What is the concern now?"],
+      reveals:[
+        "Arthur Hughes, 84, lives here. He has type 2 diabetes and heart failure.",
+        "He has missed his last three GP appointments.",
+        "His weight has dropped by 6 kg in four months.",
+        "The unopened boxes are his diuretic and diabetes medication."
+      ],
+      notes:["Move from observation to concern: there is a pattern, not a one-off.","Unopened medication and weight loss could mean self-neglect, or could mean someone is withholding them. Keep both possibilities open."]},
+    { title:"Information 2: who else?", cue:"Same scene", minutes:6,
+      brief:"A neighbour talks to you on the doorstep.",
+      prompts:["What does professional curiosity look like here?","What questions would you ask, and who would you ask them to?"],
+      reveals:[
+        "\"His nephew moved in about six months ago. Things went downhill after that.\"",
+        "\"Arthur used to do his own shopping. Now the nephew has his bank card.\"",
+        "The red bills are for gas and electricity. Arthur's pension goes into an account the nephew manages.",
+        "The nephew isn't in when you visit. His room has a new TV and games console."
+      ],
+      notes:["Possible financial or material abuse. Other types in the Care Act statutory guidance include neglect and acts of omission, psychological abuse, and self-neglect.","Professional curiosity means not taking things at face value, and \"respectful uncertainty\".","Avoid confirmation bias: the neighbour's account is information, not proof."]},
+    { title:"Information 3: Arthur's voice", cue:"Same scene (optional: audio of Arthur)", minutes:6,
+      brief:"You speak with Arthur alone.",
+      prompts:["What does Arthur want?","Does Arthur have capacity to make decisions about his money and care?","How do you balance his wishes with protecting him?"],
+      reveals:[
+        "\"He's family. I don't want to cause any trouble for him.\"",
+        "\"I don't like to ask for money. He says it's all being sorted.\"",
+        "He's clear and well-oriented, but tearful when asked about his late wife."
+      ],
+      notes:["Making Safeguarding Personal: what outcomes does Arthur want?","Mental Capacity Act 2005: presume capacity. An unwise decision does not in itself mean someone lacks capacity. Capacity is specific to each decision.","Coercion and control can affect choices even when someone has capacity."]},
+    { title:"Safeguarding response", cue:"Neutral scene", minutes:10,
+      brief:"Decide what happens next.",
+      prompts:[
+        "Does this meet the criteria for a Section 42 enquiry?",
+        "Who do you inform, and how quickly?",
+        "What do you record, and how?",
+        "Which of the six safeguarding principles apply here?"
+      ],
+      reveals:[
+        "Section 42 criteria: the adult has care and support needs, is experiencing or at risk of abuse or neglect, and because of those needs cannot protect themselves.",
+        "Six principles: Empowerment · Prevention · Proportionality · Protection · Partnership · Accountability"
+      ],
+      notes:["Response: discuss with the named safeguarding lead, refer to the local authority adult safeguarding team, record facts and direct quotes, and inform the GP.","Consider an immediate risk: is there food? Is there heating tonight?","Record factually: what you saw, what was said (verbatim), what you did, and when."]},
+    { title:"Debrief", cue:"Neutral / title scene", minutes:8,
+      brief:"Observation → concern → professional curiosity → evidence gathering → safeguarding response",
+      prompts:["At which point did you first become concerned?","What did you miss in the first five minutes?","How did your own assumptions shape what you saw?","What makes safeguarding a public health issue?"],
+      reveals:[], notes:["Revisit the three columns. Did items move between them as more information arrived?","Public health framing: prevention, population-level awareness, and financial abuse of older people as an under-reported harm."]}
+  ]
+},
+/* ---------------- 3 ---------------- */
+{
+  id:"s3", title:"Two Streets, Two Lives", short:"Health inequalities",
+  summary:"Two contrasting neighbourhoods. The same person, with the same health advice. How easy is it to follow?",
+  minutes:70, themes:["Wider determinants","Health inequalities","Marmot"],
+  outcomes:[
+    "Identify the wider determinants of health in a built environment",
+    "Critique individual-level health advice in the context of structural constraints",
+    "Apply the Dahlgren & Whitehead model to a real place",
+    "Propose interventions at individual, community and policy level"
+  ],
+  warning:"Deprivation. Some students may live in, or come from, neighbourhoods like Environment B. Avoid language that blames people.",
+  stages:[
+    { title:"Environment A", cue:"360° scene: leafy suburb (park, supermarket, bus stop, leisure centre)", minutes:6,
+      brief:"Take a walk down this street.",
+      prompts:["What do you notice about this neighbourhood?","What here supports health?","Where would you buy food, exercise or see a GP?"],
+      reveals:[], notes:["Look for: green space, a supermarket with fresh food, frequent buses, a leisure centre, well-kept housing, cleaner air, a GP surgery nearby."]},
+    { title:"Environment B", cue:"360° scene: inner-city street (takeaways, busy road, poor housing) + traffic audio", minutes:6,
+      brief:"Now walk down this street, a few miles away.",
+      prompts:["What do you notice here?","What here makes health harder?","How does it feel to be here?"],
+      reveals:[], notes:["Look for: a cluster of fast-food outlets, a convenience store instead of a supermarket, a busy road (pollution and noise), damp or overcrowded housing, little green space, a limited bus service.","Avoid blame. Point out the community assets that exist in B too."]},
+    { title:"Meet Sam", cue:"Split: both scenes (or alternate)", minutes:3,
+      brief:"Sam is 45, has recently been diagnosed with type 2 diabetes, works variable shifts, and has two children.",
+      prompts:["Sam is told: \"Eat healthily, exercise more and attend your appointments.\"","If Sam lives in Environment A, how easy is it to do that?"],
+      reveals:[], notes:["Keep Sam's characteristics identical. The only variable is the place."]},
+    { title:"Same advice, Street B", cue:"360° scene: Environment B", minutes:8,
+      brief:"Now Sam lives here.",
+      prompts:["If we tell Sam to eat healthily, exercise more and attend their appointments, how easy is it to do that?","What stands in the way?","Is this about choice?"],
+      reveals:[
+        "The nearest large supermarket is two buses away. The corner shop sells little fresh produce.",
+        "Sam's shift pattern changes weekly. The GP surgery only offers appointments between 9am and 5pm.",
+        "The park nearby has broken lighting, and Sam doesn't feel safe there after dark.",
+        "The flat is damp and the children share a room."
+      ],
+      notes:["This is the key moment. Draw out \"choice\" versus \"constraint\".","Behaviour is shaped by environment, income, time and stress, not only by knowledge.","Inverse care law: people with the greatest need often have the least access to good care."]},
+    { title:"Why the gap?", cue:"Neutral scene / Dahlgren & Whitehead diagram", minutes:10,
+      brief:"Map what you've seen onto the wider determinants of health.",
+      prompts:["Which layer of the Dahlgren & Whitehead rainbow does each factor sit in?","Which factors can Sam control, and which can't they?","Who is responsible for changing them?"],
+      reveals:[
+        "In England there is a gap of close to two decades in healthy life expectancy between the most and least deprived areas (ONS).",
+        "Marmot: \"Fair Society, Healthy Lives\" (2010) and \"Health Equity in England: 10 Years On\" (2020)."
+      ],
+      notes:["Check the latest ONS healthy life expectancy release before quoting exact figures.","Layers: individual factors → lifestyle → social and community networks → living and working conditions → general socioeconomic, cultural and environmental conditions.","Proportionate universalism: universal action, delivered at a scale and intensity that matches the level of disadvantage."]},
+    { title:"Redesign", cue:"360° scene: Environment B", minutes:12,
+      brief:"In groups, propose changes to improve health in Environment B.",
+      prompts:["One change at individual level","One change at community level","One change at policy or structural level","Which would reduce inequality the most, and why?"],
+      reveals:[], notes:["Examples: extended-hours clinics and outreach; community food projects; active travel routes; restrictions on hot-food takeaways near schools (planning policy); housing standards enforcement; Clean Air Zones.","Mention the Health in All Policies approach."]},
+    { title:"Debrief", cue:"Neutral / title scene", minutes:8,
+      brief:"Same person, same advice, different lives.",
+      prompts:["What is the problem with telling people to \"make better choices\"?","How should this change how we give health advice?","What role does public health play in place-making?"],
+      reveals:[], notes:["Link to the Core20PLUS5 approach to reducing healthcare inequalities.","Victim-blaming versus structural approaches."]}
+  ]
+},
+/* ---------------- 4 ---------------- */
+{
+  id:"s4", title:"Dementia: Experience the Environment Differently", short:"Dementia environments",
+  summary:"A familiar environment is altered with glare, patterned floors, noise and clutter. Students experience it, then redesign it using dementia-friendly principles.",
+  minutes:70, themes:["Dementia","Person-centred care","Design"],
+  outcomes:[
+    "Describe perceptual and cognitive changes that affect how people with dementia experience environments",
+    "Identify environmental features that disorient or distress",
+    "Apply dementia-friendly design principles to redesign a space",
+    "Link environmental design to person-centred care"
+  ],
+  warning:"Loud or disorienting audio and flicker. Check for photosensitivity, sensory sensitivities or motion sickness. Students may have relatives living with dementia.",
+  setup:"Two versions of the scene are needed: (1) baseline, and (2) modified: harsh or uneven lighting and glare, low contrast (e.g. white toilet on white wall), patterned or shiny flooring, dark mats at thresholds, confusing or text-only signage, competing sounds (tannoy, trolleys, music, voices), clutter.",
+  stages:[
+    { title:"Baseline", cue:"360° scene: supermarket / hospital corridor (baseline)", minutes:4,
+      brief:"Here's an everyday environment. Your task is to find the milk and then the exit.",
+      prompts:["How easy was that?","What helped you find your way?"],
+      reveals:[], notes:["Keep this quick. It gives students something to compare against."]},
+    { title:"Modified environment", cue:"360° scene: modified version + layered audio", minutes:6,
+      brief:"Same task. Find the milk, then the exit.",
+      prompts:["How did that feel?","What made it harder?","What did you do to cope?"],
+      reveals:[], notes:["Turn the audio up. Let students struggle a little before discussing.","Ask how they felt: frustrated, anxious, rushed, embarrassed?"]},
+    { title:"Why is this hard?", cue:"Modified scene (hold)", minutes:10,
+      brief:"For someone living with dementia, these features can make everyday spaces confusing or frightening.",
+      prompts:["What might a person with dementia see or hear here?","How might that show up in their behaviour?","Could this be mistaken for being \"difficult\" or \"aggressive\"?"],
+      reveals:[
+        "Dark mats or thresholds may look like holes or steps.",
+        "Shiny floors can look wet. Patterns can look like objects on the floor.",
+        "Low contrast makes toilets, handrails and doors hard to pick out.",
+        "Background noise can make it much harder to process speech and follow instructions."
+      ],
+      notes:["Dementia can affect depth perception, contrast sensitivity, attention and memory for the layout of a place.","\"Behaviour that challenges\" is often communication of an unmet need or distress."]},
+    { title:"Redesign", cue:"Modified scene (hold)", minutes:15,
+      brief:"In groups, redesign this space so it is dementia-friendly.",
+      prompts:["Lighting","Flooring and contrast","Signage and wayfinding","Sound","Rest, reassurance and people"],
+      reveals:[
+        "Principles: even natural light, no glare · plain matt floors with a consistent tone · contrasting colours for key objects · signs with picture and words at eye level · less noise · places to sit · familiar cues",
+        "Tools: The King's Fund EHE environmental assessment tools · University of Stirling DSDC design guidance"
+      ],
+      notes:["Staff are part of the environment: a calm approach, time, and a person-centred conversation.","Ask whether dementia-friendly design also helps other people (older people, people with visual impairment, autistic people). Usually it does."]},
+    { title:"Present redesigns", cue:"Neutral scene or group sketches", minutes:10,
+      brief:"Each group presents its top three changes.",
+      prompts:["Which change is cheapest, and which has the biggest impact?","Who would need to agree to it?"],
+      reveals:[], notes:["Push for realistic, costed thinking."]},
+    { title:"Debrief", cue:"Neutral / title scene", minutes:8,
+      brief:"Environment is part of care.",
+      prompts:["What surprised you?","How does environment link to person-centred care?","Where in public health does this matter (hospitals, towns, transport)?"],
+      reveals:[], notes:["Dementia Friendly Communities (Alzheimer's Society).","Emphasise that the environment can disable or enable."]}
+  ]
+},
+/* ---------------- 5 ---------------- */
+{
+  id:"s5", title:"What Can You See? Home Edition", short:"Observation & bias",
+  summary:"Students enter a 360° home knowing nothing. They record observations, then the case history reframes everything.",
+  minutes:55, themes:["Observation","Bias","Young carers"],
+  outcomes:[
+    "Record objective observations separately from interpretation",
+    "Recognise how assumptions and bias shape judgements",
+    "Reconsider evidence in light of new information",
+    "Identify hidden carers as a public health group"
+  ],
+  warning:"Caring responsibilities. Some students may be, or have been, young carers.",
+  stages:[
+    { title:"Enter the home", cue:"360° scene: busy family home (washing, pill organiser, school bag, wheelchair ramp outside, takeaway boxes)", minutes:1,
+      brief:"You have been asked to visit this home. You know nothing about who lives here.",
+      prompts:["Don't discuss yet. Just look."],
+      reveals:[], notes:["Say nothing more about the person or the purpose of the visit."]},
+    { title:"Document", cue:"Same scene", minutes:8,
+      brief:"Individually, write down everything you notice.",
+      prompts:["What can you see?","Who do you think lives here?","What do you think their life is like?"],
+      reveals:[], notes:["Encourage detail: brands, dates, positions, smells implied, what is missing."]},
+    { title:"Share and sort", cue:"Same scene", minutes:8,
+      brief:"Share your notes. Sort them into facts and interpretations.",
+      prompts:["What did everyone notice?","What did only one person notice?","Which of your notes are judgements?"],
+      reveals:[], notes:["Collect \"who lives here\" guesses. Students often assume neglect, chaos or a lazy teenager."]},
+    { title:"Case history: part 1", cue:"Same scene", minutes:5,
+      brief:"Here is who lives here.",
+      prompts:["Look again. What do you see differently?"],
+      reveals:[
+        "Priya is 15. She lives with her mum, Anita, who has multiple sclerosis.",
+        "Priya manages her mum's medication, the shopping and most of the housework.",
+        "Her school has recorded her as persistently late."
+      ],
+      notes:["The pill organiser, the ramp, the takeaways and the unfinished homework all look different now."]},
+    { title:"Reconsider", cue:"Same scene", minutes:8,
+      brief:"Go back through your original notes.",
+      prompts:["Which observations still stand?","Which interpretations were wrong?","What did you miss completely?","What might a professional visiting for Anita have missed about Priya?"],
+      reveals:[
+        "Priya hasn't told anyone at school. She worries that she and her mum would be separated."
+      ],
+      notes:["Young carers are often hidden. The Children and Families Act 2014 gives young carers the right to an assessment of their needs.","Think Whole Family approach."]},
+    { title:"Debrief", cue:"Neutral / title scene", minutes:8,
+      brief:"What we see depends on what we expect.",
+      prompts:["Which of your assumptions came from your own experience?","How can we guard against bias in practice?","Why are hidden carers a public health issue?"],
+      reveals:[], notes:["Unconscious bias, the fundamental attribution error, and confirmation bias.","Tip: record observations first, and interpretations separately."]}
+  ]
+},
+/* ---------------- 6 ---------------- */
+{
+  id:"s6", title:"Communication Challenge", short:"Communication",
+  summary:"Communication gets harder as the environment changes, from a quiet room to a busy ward to a crowded waiting room to a person's home, and each setting brings a new service user need.",
+  minutes:75, themes:["Communication","Reasonable adjustments","Accessible Information Standard"],
+  outcomes:[
+    "Adapt communication to the needs of the individual and the setting",
+    "Identify reasonable adjustments for people with communication needs",
+    "Apply the Accessible Information Standard",
+    "Use techniques such as teach-back to check understanding"
+  ],
+  warning:"Role play. Set ground rules: no mimicking impairments or accents.",
+  stages:[
+    { title:"Quiet consultation room", cue:"360° scene: calm consultation room", minutes:10,
+      brief:"You need to explain a new medication to Mr Okafor, 70, who has a hearing impairment.",
+      prompts:["How would you prepare the room?","How would you adapt how you speak?","How would you check he has understood?"],
+      reveals:["He wears hearing aids, but the batteries are flat.","He relies partly on lip-reading."],
+      notes:["Face the person, with light on your face. Don't shout. Speak clearly at a normal pace. Rephrase rather than repeat.","Check hearing aids. Written information. Teach-back.","If someone uses BSL, book a qualified BSL interpreter."]},
+    { title:"Busy ward", cue:"360° scene: busy ward + ambient audio (alarms, voices)", minutes:10,
+      brief:"You need to discuss discharge with Mrs Kowalczyk, 58, who speaks limited English.",
+      prompts:["What's the challenge here?","Who could help you communicate?","What shouldn't you do?"],
+      reveals:["Her 12-year-old granddaughter is visiting and offers to translate."],
+      notes:["Use a professional interpreter (face to face, phone or video). Don't use family members, and especially not children.","Move to a quieter space if you can. Use plain language, avoid jargon, and use teach-back."]},
+    { title:"Crowded waiting room", cue:"360° scene: crowded waiting room + loud audio", minutes:10,
+      brief:"You call Daniel, 24, who has a learning disability and is visibly anxious.",
+      prompts:["What do you notice about Daniel?","How would you adapt the environment?","What adjustments could have been made before today?"],
+      reveals:["Daniel has a hospital passport in his bag.","The noise and waiting are making his anxiety worse."],
+      notes:["Reasonable adjustments (Equality Act 2010): a quiet space, first or last appointment, longer appointments, easy read information.","Hospital passport. Involve his supporter, but speak to Daniel directly.","LeDeR (Learning from Lives and Deaths): people with a learning disability die younger, often from avoidable causes."]},
+    { title:"Person's home", cue:"360° scene: home environment", minutes:10,
+      brief:"You visit Elsie, 86, who has cognitive impairment, to talk about her care plan.",
+      prompts:["How is communicating here different from the ward?","How would you support Elsie to take part in decisions?","Who else might you involve?"],
+      reveals:["Elsie repeats questions and becomes upset when she can't remember your name."],
+      notes:["Short sentences, one idea at a time. Allow time. Use visual cues and reassurance.","Mental Capacity Act: support the person to make their own decisions as far as possible."]},
+    { title:"Compare & debrief", cue:"Neutral / title scene", minutes:12,
+      brief:"Look back across all four settings.",
+      prompts:["How did the environment change your communication?","Which adjustments are useful for everyone?","What is the Accessible Information Standard, and who does it apply to?","One technique you'll use in practice."],
+      reveals:["Accessible Information Standard (2016): identify, record, flag, share and meet people's information and communication needs."],
+      notes:["It applies to NHS and publicly funded adult social care providers.","Health literacy is a public health issue: poor communication widens inequalities."]}
+  ]
+},
+/* ---------------- 7 ---------------- */
+{
+  id:"s7", title:"Mental Health: Seeing the Environment Differently", short:"Environment & wellbeing",
+  summary:"This scenario does not simulate mental illness. Students compare five environments and their effect on stress, isolation, wellbeing and help-seeking.",
+  minutes:65, themes:["Mental wellbeing","Environment","Help-seeking"],
+  outcomes:[
+    "Identify environmental factors that affect stress and wellbeing",
+    "Explain the relationship between social isolation and mental health",
+    "Apply the Five Ways to Wellbeing framework",
+    "Recognise barriers to help-seeking in different settings"
+  ],
+  warning:"Mental health. Give a content note at the start, make opt-out easy, and signpost student wellbeing services at the end.",
+  stages:[
+    { title:"Crowded urban", cue:"360° scene: busy city centre + traffic/crowd audio", minutes:5,
+      brief:"Stand in this space for a minute before we talk.",
+      prompts:["How does this environment feel?","What might increase stress here?","What might support wellbeing here?"],
+      reveals:[], notes:["Noise, crowding, lack of control, pollution. But also connection, busyness, and a sense of anonymity that some people like."]},
+    { title:"Isolated home", cue:"360° scene: quiet, dim home interior", minutes:5,
+      brief:"Now this space.",
+      prompts:["How does this environment feel?","Who might spend most of their day here?","What might be missing?"],
+      reveals:[], notes:["Isolation versus solitude. Loneliness is subjective. Consider people who are housebound, caring, unemployed or working from home."]},
+    { title:"Workplace", cue:"360° scene: open-plan office or warehouse", minutes:5,
+      brief:"Now a workplace.",
+      prompts:["What might affect wellbeing at work?","How easy is it to ask for help here?"],
+      reveals:[], notes:["Workload, control, support, noise, job insecurity. The HSE Management Standards cover six areas of work design linked to stress."]},
+    { title:"Green space", cue:"360° scene: park / woodland + natural audio", minutes:5,
+      brief:"Now this space.",
+      prompts:["How does this compare?","Who has access to spaces like this, and who doesn't?"],
+      reveals:[], notes:["Evidence links green and blue space with better mental wellbeing. Access is unequal (connect to Scenario 3).","Green social prescribing."]},
+    { title:"Clinical waiting room", cue:"360° scene: clinical waiting room", minutes:5,
+      brief:"Finally, a place where someone might come for help.",
+      prompts:["How would it feel to wait here for a mental health appointment?","What might put someone off coming back?"],
+      reveals:[], notes:["Stigma, lack of privacy, a clinical feel, long waits. Compare with community-based, non-clinical settings."]},
+    { title:"Compare", cue:"Neutral scene", minutes:12,
+      brief:"Look across all five environments.",
+      prompts:["Which environmental factors contribute to stress?","Which contribute to social isolation?","Which support wellbeing?","Which help or hinder help-seeking?"],
+      reveals:["Five Ways to Wellbeing (New Economics Foundation, 2008): Connect · Be active · Take notice · Keep learning · Give"],
+      notes:["Build a 5 × 4 grid on the board: environments × (stress / isolation / wellbeing / help-seeking)."]},
+    { title:"Debrief & wellbeing", cue:"Calm scene (green space)", minutes:10,
+      brief:"How could environments be designed to support mental wellbeing?",
+      prompts:["One change to each environment","Where does public health have influence (planning, workplaces, services)?","How are you feeling after this session?"],
+      reveals:[], notes:["Close with the calm scene. Signpost student support services.","Emphasise that environment affects everyone's wellbeing, not only people with a diagnosis."]}
+  ]
+},
+/* ---------------- 8 ---------------- */
+{
+  id:"s8", title:"Accessibility Audit", short:"Accessibility",
+  summary:"Groups audit everyday environments from assigned perspectives, including wheelchair user, visual impairment, autism, frailty and others.",
+  minutes:80, themes:["Accessibility","Equality Act 2010","Social model"],
+  outcomes:[
+    "Conduct a structured accessibility audit of a public environment",
+    "Apply the social model of disability",
+    "Identify duties under the Equality Act 2010, including reasonable adjustments",
+    "Prioritise realistic recommendations for improvement"
+  ],
+  warning:"Don't simulate impairments. Students audit from a perspective, using evidence and empathy.",
+  stages:[
+    { title:"Assign perspectives", cue:"Neutral / title scene", minutes:5,
+      brief:"Each group will audit from a different perspective.",
+      widget:{type:"assign", items:["Wheelchair user","Visual impairment","Hearing impairment","Learning disability","Autistic person","Frailty","Parent with pushchair"]},
+      prompts:["Before we start: what does \"accessible\" mean to you?"],
+      reveals:[], notes:["Set the number of groups, then shuffle. Perspectives repeat if there are more than seven groups."]},
+    { title:"Walkthrough", cue:"360° scenes in turn: GP surgery → hospital → supermarket → bus station → workplace → university → leisure centre", minutes:15,
+      brief:"Move through the environments. Look at everything from your group's perspective.",
+      prompts:["Getting there and the approach","Entrance and reception","Moving around","Signs and information","Toilets and facilities","Sound, light and sensory load","Staff and how they respond"],
+      reveals:[], notes:["Pick 2–3 environments if time is short. Suggested: GP surgery, bus station, university.","Students log barriers against each audit category."]},
+    { title:"Audit", cue:"Hold on chosen environment", minutes:15,
+      brief:"Complete your audit. For each barrier: where is it, who does it affect, and how serious is it?",
+      prompts:["List barriers by category","Rate each one: high, medium or low impact","Which barriers also affect other groups?"],
+      reveals:[], notes:["Suggested format: Location | Barrier | Who is affected | Impact (H/M/L) | Suggested fix."]},
+    { title:"Feedback", cue:"Neutral scene", minutes:15,
+      brief:"Each group presents its top three barriers.",
+      prompts:["What did your perspective reveal that others missed?","Were there barriers everyone found?"],
+      reveals:[], notes:["Draw out overlaps. Good design for one group often helps many (the \"curb-cut effect\")."]},
+    { title:"Framework", cue:"Neutral scene", minutes:8,
+      brief:"Who is disabled by these environments?",
+      prompts:["Medical model or social model: which did your audit reflect?","What does the law require?"],
+      reveals:[
+        "Social model: people are disabled by barriers in society, not by their impairment.",
+        "Equality Act 2010: service providers have an anticipatory duty to make reasonable adjustments.",
+        "Accessible Information Standard: information must be provided in a format people can use."
+      ],
+      notes:["Link to health inequalities: poor access to services leads to poorer outcomes."]},
+    { title:"Recommendations & debrief", cue:"Neutral / title scene", minutes:12,
+      brief:"Prioritise your recommendations.",
+      prompts:["One quick win (low cost, this month)","One medium-term change","One structural change","How would you involve disabled people in the redesign?"],
+      reveals:[], notes:["\"Nothing about us without us.\" Co-production.","Groups could submit their audit as a formative task."]}
+  ]
+}
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const store = {
+  get(k,d){try{const v=localStorage.getItem("xrp:"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem("xrp:"+k,JSON.stringify(v))}catch(e){}}
+};
+let S = { view:"home", sid:null, stage:0, promptN:0, revealN:0, notes:false,
+          timerLeft:0, timerRun:false, timerEnd:false };
+let tick = null;
+let scale = store.get("scale",1);
+document.documentElement.style.setProperty("--scale",scale);
+const savedTheme = store.get("theme",null);
+if(savedTheme) document.documentElement.dataset.theme = savedTheme;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sc = () => SCENARIOS.find(x=>x.id===S.sid);
+const fmt = s => { s=Math.max(0,Math.round(s)); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); };
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  const v = $("#view");
+  $("#bNotes").classList.toggle("on",S.notes);
+  $("#bNotes").classList.toggle("hidden",S.view==="home");
+  if(S.view==="home") return renderHome(v);
+  if(S.view==="overview") return renderOverview(v);
+  renderStage(v);
+}
+
+function renderHome(v){
+  $("#barTitle").textContent = "XRP Session Runner · Public Health";
+  v.innerHTML = `<div class="home">
+    <h2>XRP Room Scenarios</h2>
+    <p class="lead">Choose a scenario to see its outcomes and room set-up, then run it stage by stage. Notes for the facilitator stay hidden until you press <kbd>N</kbd>, so this screen is safe to project.</p>
+    <div class="grid">${SCENARIOS.map((s,i)=>{
+      const prog = store.get("prog:"+s.id,null);
+      return `<button class="card" data-open="${s.id}">
+        <span class="num">Scenario ${i+1}</span>
+        <h3>${esc(s.title)}</h3>
+        <p>${esc(s.summary)}</p>
+        ${prog!=null && prog>0 ? `<span class="resume">Paused at stage ${prog+1} of ${s.stages.length}</span>`:""}
+        <div class="meta"><span class="chip">~${s.minutes} min</span><span class="chip">${s.stages.length} stages</span>${s.themes.map(t=>`<span class="chip">${esc(t)}</span>`).join("")}</div>
+      </button>`}).join("")}</div></div>`;
+  v.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{S.sid=b.dataset.open;S.view="overview";render();window.scrollTo(0,0)});
+}
+
+function renderOverview(v){
+  const s = sc(), i = SCENARIOS.indexOf(s);
+  $("#barTitle").textContent = `Scenario ${i+1} · ${s.short}`;
+  const prog = store.get("prog:"+s.id,0);
+  const total = s.stages.reduce((a,st)=>a+(st.minutes||0),0);
+  v.innerHTML = `<div class="overview">
+    <span class="num">Scenario ${i+1} · ~${s.minutes} min (timed stages add up to ${total} min)</span>
+    <h2>${esc(s.title)}</h2>
+    <p style="font-size:1.15rem;color:var(--muted);max-width:70ch;margin:0">${esc(s.summary)}</p>
+    <div class="cols">
+      <div class="box"><h4>Learning outcomes</h4><ol>${s.outcomes.map(o=>`<li>${esc(o)}</li>`).join("")}</ol></div>
+      <div class="box warn"><h4>Content note</h4><p style="margin:0">${esc(s.warning)}</p></div>
+      ${s.setup?`<div class="box full"><h4>Scene preparation</h4><p style="margin:0">${esc(s.setup)}</p></div>`:""}
+      <div class="box full"><h4>Room set-up: scenes to load in order</h4>
+        <table class="setup">${s.stages.map((st,k)=>`<tr><td>${k+1}. ${esc(st.title)}</td><td>${esc(st.cue)}</td><td style="white-space:nowrap">${st.minutes} min</td></tr>`).join("")}</table>
+      </div>
+    </div>
+    <div class="navfoot">
+      <button class="btn primary" id="go">${prog>0?`Resume at stage ${prog+1}`:"Start session"} →</button>
+      ${prog>0?`<button class="btn" id="restart">Start from the beginning</button>`:""}
+      <button class="btn" id="print">Print facilitator pack</button>
+      <button class="btn" id="back">← All scenarios</button>
+    </div></div>`;
+  $("#go").onclick=()=>goStage(prog);
+  if($("#restart")) $("#restart").onclick=()=>goStage(0);
+  $("#print").onclick=printPack;
+  $("#back").onclick=goHome;
+}
+
+function renderStage(v){
+  const s = sc(), i = SCENARIOS.indexOf(s), st = s.stages[S.stage];
+  $("#barTitle").textContent = `Scenario ${i+1} · ${s.short}`;
+  const prompts = st.prompts||[], reveals = st.reveals||[];
+  v.innerHTML = `<div class="session">
+    <nav class="rail">${s.stages.map((x,k)=>`<button data-st="${k}" class="${k===S.stage?"cur":k<S.stage?"done":""}"><span class="n">${k+1}</span><span class="lab">${esc(x.title)}</span></button>`).join("")}</nav>
+    <section class="stage">
+      <div class="kicker">Stage ${S.stage+1} of ${s.stages.length}</div>
+      <h2>${esc(st.title)}</h2>
+      ${S.notes?`<div class="cue">Room cue: <b>${esc(st.cue)}</b></div>`:""}
+      <p class="brief">${esc(st.brief)}</p>
+      ${st.minutes?`<div class="row"><div class="timer ${S.timerRun?"run":""} ${S.timerEnd?"end":""}" id="timer">
+          <div><div class="lbl">Timer</div><div class="t" id="tval">${fmt(S.timerLeft)}</div></div>
+          <button class="btn" id="tgo">${S.timerRun?"Pause":"Start"}</button>
+          <button class="btn" id="treset" title="Reset">↺</button>
+          <button class="btn" id="tplus" title="+1 minute">+1</button>
+        </div></div>`:""}
+      ${st.widget&&st.widget.type==="assign"?renderAssign(st.widget):""}
+      ${prompts.length?`<h3 class="sec">Questions ${S.promptN<prompts.length?`<button class="btn" id="pall">Show all</button>`:""}</h3>
+        <ul class="prompts">${prompts.slice(0,S.promptN).map((p,k)=>`<li class="${k===S.promptN-1?"new":""}">${esc(p)}</li>`).join("")}
+        ${S.promptN<prompts.length?`<li class="ghost" id="pnext">＋ Next question (Space) · ${prompts.length-S.promptN} remaining</li>`:""}</ul>`:""}
+      ${reveals.length?`<h3 class="sec">New information</h3><div class="reveals">${reveals.map((r,k)=>k<S.revealN
+          ?`<div class="rv open ${k===S.revealN-1?"new":""}"><span class="rl">Reveal ${k+1}</span>${esc(r)}</div>`
+          :`<button class="rv shut" data-rv="${k}">Reveal ${k+1}${k===S.revealN?" (R)":""}</button>`).join("")}</div>`:""}
+      ${S.notes&&st.notes&&st.notes.length?`<div class="notes"><h4>Facilitator notes</h4><ul>${st.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul></div>`:""}
+      <div class="navfoot">
+        ${S.stage>0?`<button class="btn" id="prev">← Previous</button>`:`<button class="btn" id="ov">← Overview</button>`}
+        ${S.stage<s.stages.length-1?`<button class="btn primary" id="next">Next: ${esc(s.stages[S.stage+1].title)} →</button>`:`<button class="btn primary" id="finish">Finish session ✓</button>`}
+      </div>
+    </section></div>`;
+  v.querySelectorAll("[data-st]").forEach(b=>b.onclick=()=>goStage(+b.dataset.st));
+  v.querySelectorAll("[data-rv]").forEach(b=>b.onclick=()=>{S.revealN=Math.max(S.revealN,+b.dataset.rv+1);render()});
+  const on=(id,f)=>{const e=$("#"+id);if(e)e.onclick=f};
+  on("pnext",nextPrompt); on("pall",()=>{S.promptN=prompts.length;render()});
+  on("tgo",toggleTimer); on("treset",resetTimer); on("tplus",()=>{S.timerLeft+=60;S.timerEnd=false;render()});
+  on("prev",()=>goStage(S.stage-1)); on("next",()=>goStage(S.stage+1)); on("ov",()=>{S.view="overview";stopTimer();render()});
+  on("finish",()=>{store.set("prog:"+s.id,0);stopTimer();goHome()});
+  bindAssign();
+}
+
+/* ---------- group assigner ---------- */
+let assignState = store.get("assign",{n:7,order:null});
+function renderAssign(w){
+  const n = Math.max(1,Math.min(20,assignState.n|0));
+  const order = assignState.order && assignState.order.length===w.items.length ? assignState.order : w.items.map((_,k)=>k);
+  return `<h3 class="sec">Group perspectives</h3><div class="assign">
+    <div class="ctl">Groups: <input type="number" id="agN" min="1" max="20" value="${n}"> <button class="btn" id="agShuffle">Shuffle</button></div>
+    ${Array.from({length:n},(_,g)=>`<div class="ar"><span class="g">Group ${g+1}</span>${esc(w.items[order[g%order.length]])}</div>`).join("")}
+  </div>`;
+}
+function bindAssign(){
+  const n=$("#agN"), sh=$("#agShuffle");
+  if(n) n.onchange=()=>{assignState.n=+n.value||1;store.set("assign",assignState);render()};
+  if(sh) sh.onclick=()=>{
+    const items=sc().stages[S.stage].widget.items.map((_,k)=>k);
+    for(let k=items.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[items[k],items[j]]=[items[j],items[k]]}
+    assignState.order=items;store.set("assign",assignState);render();
+  };
+}
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+function goHome(){stopTimer();S.view="home";S.sid=null;render();window.scrollTo(0,0)}
+function goStage(k){
+  const s=sc(); if(!s) return;
+  k=Math.max(0,Math.min(s.stages.length-1,k));
+  stopTimer();
+  S.view="stage"; S.stage=k; S.promptN=Math.min(1,(s.stages[k].prompts||[]).length); S.revealN=0;
+  S.timerLeft=(s.stages[k].minutes||0)*60; S.timerEnd=false;
+  store.set("prog:"+s.id,k);
+  render(); window.scrollTo(0,0);
+}
+function nextPrompt(){const p=sc().stages[S.stage].prompts||[];if(S.promptN<p.length){S.promptN++;render()}}
+function nextReveal(){const r=sc().stages[S.stage].reveals||[];if(S.revealN<r.length){S.revealN++;render()}}
+function toggleTimer(){
+  if(!sc().stages[S.stage].minutes) return;
+  if(S.timerRun){stopTimer();render();return}
+  if(S.timerLeft<=0){S.timerLeft=sc().stages[S.stage].minutes*60;S.timerEnd=false}
+  S.timerRun=true; let last=Date.now();
+  tick=setInterval(()=>{
+    const now=Date.now(); S.timerLeft-=(now-last)/1000; last=now;
+    if(S.timerLeft<=0){S.timerLeft=0;S.timerEnd=true;stopTimer();chime();render();return}
+    const t=$("#tval"); if(t) t.textContent=fmt(S.timerLeft);
+  },250);
+  render();
+}
+function stopTimer(){S.timerRun=false;if(tick){clearInterval(tick);tick=null}}
+function resetTimer(){stopTimer();S.timerLeft=(sc().stages[S.stage].minutes||0)*60;S.timerEnd=false;render()}
+function chime(){
+  try{const a=new (window.AudioContext||window.webkitAudioContext)();
+    [660,880].forEach((f,k)=>{const o=a.createOscillator(),g=a.createGain();o.frequency.value=f;o.connect(g);g.connect(a.destination);
+      const t=a.currentTime+k*.25;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.2,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.6);o.start(t);o.stop(t+.65)})}catch(e){}
+}
+function setScale(d){scale=Math.max(.8,Math.min(1.8,+(scale+d).toFixed(2)));document.documentElement.style.setProperty("--scale",scale);store.set("scale",scale)}
+function toggleHelp(on){$("#help").classList.toggle("hidden",on===undefined?!$("#help").classList.contains("hidden")?true:false:!on)}
+function toggleFull(){try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(e){}}
+
+function printPack(){
+  const s=sc(), i=SCENARIOS.indexOf(s);
+  $("#pack").innerHTML = `<h1>Scenario ${i+1}: ${esc(s.title)}</h1>
+    <p>${esc(s.summary)} (~${s.minutes} min)</p>
+    <h3>Learning outcomes</h3><ol>${s.outcomes.map(o=>`<li>${esc(o)}</li>`).join("")}</ol>
+    <h3>Content note</h3><p>${esc(s.warning)}</p>
+    ${s.setup?`<h3>Scene preparation</h3><p>${esc(s.setup)}</p>`:""}
+    ${s.stages.map((st,k)=>`<section><h2>${k+1}. ${esc(st.title)} (${st.minutes} min)</h2>
+      <div class="cue">Room cue: ${esc(st.cue)}</div>
+      <p><em>${esc(st.brief)}</em></p>
+      ${st.widget&&st.widget.type==="assign"?`<h3>Perspectives</h3><p>${st.widget.items.map(esc).join(" · ")}</p>`:""}
+      ${(st.prompts||[]).length?`<h3>Questions</h3><ul>${st.prompts.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>`:""}
+      ${(st.reveals||[]).length?`<h3>Reveals (in order)</h3><ol>${st.reveals.map(p=>`<li>${esc(p)}</li>`).join("")}</ol>`:""}
+      ${(st.notes||[]).length?`<h3>Facilitator notes</h3><ul>${st.notes.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>`:""}
+    </section>`).join("")}`;
+  window.print();
+}
+
+/* ---------- wiring ---------- */
+$("#bHome").onclick=goHome;
+$("#bNotes").onclick=()=>{S.notes=!S.notes;render()};
+$("#bSmaller").onclick=()=>setScale(-.1);
+$("#bBigger").onclick=()=>setScale(.1);
+$("#bTheme").onclick=()=>{const r=document.documentElement;const t=r.dataset.theme==="light"?"dark":"light";r.dataset.theme=t;store.set("theme",t)};
+$("#bFull").onclick=toggleFull;
+$("#bHelp").onclick=()=>toggleHelp(true);
+$("#help").onclick=e=>{if(e.target.id==="help")toggleHelp(false)};
+
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"||e.ctrlKey||e.metaKey||e.altKey) return;
+  const k=e.key;
+  if(k==="?"){toggleHelp(true);return}
+  if(k==="Escape"){toggleHelp(false);return}
+  if(k==="+"||k==="="){setScale(.1);return}
+  if(k==="-"||k==="_"){setScale(-.1);return}
+  if(k==="f"||k==="F"){toggleFull();return}
+  if(k==="h"||k==="H"){goHome();return}
+  if(S.view==="overview" && (k==="ArrowRight"||k==="PageDown"||k==="Enter")){e.preventDefault();goStage(store.get("prog:"+S.sid,0));return}
+  if(S.view!=="stage") return;
+  if(k==="ArrowRight"||k==="PageDown"){e.preventDefault();goStage(S.stage+1)}
+  else if(k==="ArrowLeft"||k==="PageUp"){e.preventDefault();goStage(S.stage-1)}
+  else if(k===" "){e.preventDefault();nextPrompt()}
+  else if(k==="r"||k==="R"){nextReveal()}
+  else if(k==="t"||k==="T"){toggleTimer()}
+  else if(k==="0"){resetTimer()}
+  else if(k==="n"||k==="N"){S.notes=!S.notes;render()}
+});
+
+try{ render(); }catch(err){ $("#view").innerHTML='<div class="home"><h2>Something went wrong</h2><p class="lead">'+esc(err&&err.message||err)+'</p></div>'; }
+</script>
+</body>
+</html>
